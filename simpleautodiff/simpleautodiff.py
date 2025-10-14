@@ -24,11 +24,14 @@ class Node:
             self.name = "v%d" % (Node.intermediate_count)
 
         if Node.verbose == True:
-            print("{:<2} = {:<18} = {:<8}".format(
+            print(self)
+
+    def __repr__(self):
+
+        return "{:<2} = {:<15} = {:<8}".format(
                 self.name,
                 self.operator+str([p.name for p in self.parent_nodes]),
                 self.value.__round__(3))
-            )
 
 
 def add(node1, node2):
@@ -79,7 +82,7 @@ def sin(node):
     return newNode
 
 
-def topological_order(rootNode):
+def topological_order_forward(rootNode):
     def add_children(node):
         if node not in visited:
             visited.add(node)
@@ -91,9 +94,22 @@ def topological_order(rootNode):
     return list(reversed(ordering))
 
 
+def topological_order_reverse(rootNode):
+    def add_parent(node):
+        if node not in visited:
+            visited.add(node)
+            for parent in node.parent_nodes:
+                add_parent(parent)
+            ordering.append(node)
+    ordering, visited = [], set()
+    add_parent(rootNode)
+    return list(reversed(ordering))
+
+
 def forward(rootNode):
     rootNode.partial_derivative = 1
-    ordering = topological_order(rootNode)
+    ordering = topological_order_forward(rootNode)
+
     for node in ordering[1:]:
         partial_derivative = 0
         for i in range(len(node.parent_nodes)):
@@ -119,3 +135,79 @@ def forward(rootNode):
                 value_process.strip(" + "),
                 str(node.partial_derivative.__round__(3)))
             )
+
+def reverse(rootNode):
+    rootNode.partial_derivative = 1
+    ordering = topological_order_reverse(rootNode)
+
+    for node in ordering[1:]:
+        partial_derivative = 0
+        for i in range(len(node.child_nodes)):
+            dchild_dnode = node.child_nodes[i].grad_wrt_parents[node.child_nodes[i].parent_nodes.index(node)]
+            dy_dchild = node.child_nodes[i].partial_derivative
+            partial_derivative += dy_dchild * dchild_dnode
+        node.partial_derivative = partial_derivative
+
+        if Node.verbose == True:
+            symbol_process = ""
+            value_process = ""
+
+            for i in range(len(node.child_nodes)):
+                dchild_dnode = node.child_nodes[i].grad_wrt_parents[node.child_nodes[i].parent_nodes.index(node)]
+                dy_dchild = node.child_nodes[i].partial_derivative
+
+                symbol_process += "(d" + rootNode.name + "/d" + node.child_nodes[i].name + ")" +\
+                      "(d" + node.child_nodes[i].name + "/d" + node.name + ")" + " + " 
+                
+                value_process += "(" + str(dy_dchild.__round__(3)) + ")(" + \
+                    str(dchild_dnode.__round__(3)) + ") + "
+
+                
+            print('d{:<2}/d{:<2} = {:<45} \n\t= {:<30} = {:<5}'.format(
+                rootNode.name,
+                node.name,
+                symbol_process.strip(" + "),
+                value_process.strip(" + "),
+                str(node.partial_derivative.__round__(3)))
+            )
+
+def reset(rootNode):
+    def _reset(node):
+        if node not in visited:
+            visited.add(node)
+            for parent in node.parent_nodes:
+                _reset(parent)
+            node.partial_derivative = 0
+    visited = set()
+    _reset(rootNode)
+    return rootNode
+
+def debug_computational_graph(rootNode, save_path):
+    import pydot
+    vis_graph = pydot.Dot(graph_type = "digraph")
+    graph_root = pydot.Node(name=f"{rootNode.name}")
+    vis_graph.add_node(graph_root)
+    graph_root.set("label", f"{rootNode}")
+    graph_root.set("shape", "box")
+
+    def create_edges(curNode):
+        for parent in curNode.parent_nodes:
+            graph_parent = vis_graph.get_node(f"{parent.name}")
+
+            if graph_parent:
+                graph_parent = graph_parent[0]
+            else:
+                graph_parent = pydot.Node(name=f"{parent.name}")
+                vis_graph.add_node(graph_parent)
+
+            vis_graph.add_edge(pydot.Edge(f"{parent.name}", f"{curNode.name}"))
+            graph_parent.set("label", f"{str(parent)}")
+            graph_root.set("shape", "box")
+
+            create_edges(parent)
+    
+    create_edges(rootNode)
+
+    vis_graph.write_png(save_path)
+    return vis_graph
+

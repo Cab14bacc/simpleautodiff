@@ -34,6 +34,9 @@ class Node:
                 self.value.__round__(3))
 
 
+
+
+
 def add(node1, node2):
     value = node1.value + node2.value
     parent_nodes = [node1, node2]
@@ -109,7 +112,6 @@ def topological_order_reverse(rootNode):
 def forward(rootNode):
     rootNode.partial_derivative = 1
     ordering = topological_order_forward(rootNode)
-
     for node in ordering[1:]:
         partial_derivative = 0
         for i in range(len(node.parent_nodes)):
@@ -139,11 +141,11 @@ def forward(rootNode):
 def reverse(rootNode):
     rootNode.partial_derivative = 1
     ordering = topological_order_reverse(rootNode)
-
     for node in ordering[1:]:
         partial_derivative = 0
         for i in range(len(node.child_nodes)):
-            dchild_dnode = node.child_nodes[i].grad_wrt_parents[node.child_nodes[i].parent_nodes.index(node)]
+            parent_idx_in_child = node.child_nodes[i].parent_nodes.index(node)
+            dchild_dnode = node.child_nodes[i].grad_wrt_parents[parent_idx_in_child]
             dy_dchild = node.child_nodes[i].partial_derivative
             partial_derivative += dy_dchild * dchild_dnode
         node.partial_derivative = partial_derivative
